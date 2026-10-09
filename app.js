@@ -6,7 +6,7 @@ const API="/api/data";
 let PIN=(()=>{try{return sessionStorage.getItem("suro-pin")||""}catch(e){return ""}})();
 let pushT=null,synced=false,remoteEmpty=false,ver=null;
 
-const R=["Kapten / operator","Operator","Strategi","Programmer","Mekanik","Cadangan"];
+const R=["Kapten / operator","Operator","Elektronika","Programmer","Mekanik","Cadangan"];
 const K="suro-cup-v1",OLD_K="rsf-demo-5";
 let S,V="home",note="",ok=(()=>{try{return sessionStorage.getItem("suro-ok")==="1"&&!!sessionStorage.getItem("suro-pin")}catch(e){return false}})();
 
