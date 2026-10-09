@@ -1,5 +1,5 @@
 
-const ADMIN_PIN="1234";
+const ADMIN_PIN="EURO2425";
 
 const T=[];
 const F=[];
@@ -139,16 +139,16 @@ const VW={
   ad(){
     if(!ok)return `<p><input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN admin" onkeydown="if(event.key==='Enter')login()"> <button class="b" onclick="login()">Masuk</button></p><p role="status">${note}</p>`;
     const c=S.cfg,inp=(k,l,t)=>`<label>${l}<br><input type="${t||"number"}" min="1" value="${esc(c[k])}" onchange="S.cfg.${k}=${t?"this.value":"Math.max(1,+this.value||1)"};save()"></label> `;
-    return `<p><button class="b b2" onclick="logout()">Keluar</button></p><p role="status">${note}</p><h2>Tim (${S.teams.length})</h2><p><small>Pilih grup tiap tim sesuai hasil undian technical meeting.</small></p>${S.teams.map(t=>`<div class="ar"><span>${esc(t.n)} <small>${esc(t.s)}</small></span><span><select aria-label="Grup ${esc(t.n)}"${S.matches.length?" disabled":""} onchange="sgrp(${t.id},this.value)"><option value="">Belum ada grup</option>${"ABCDEFGH".split("").map(g=>`<option value="${g}"${t.g===g?" selected":""}>Grup ${g}</option>`).join("")}</select> <button class="b b2" onclick="delTeam(${t.id})">Hapus</button></span></div>`).join("")||"<p>Belum ada tim.</p>"}
+    return `<p><button class="b b2" onclick="logout()">Keluar</button></p><p role="status">${note}</p><h2>Tim (${S.teams.length})</h2><p></p>${S.teams.map(t=>`<div class="ar"><span>${esc(t.n)} <small>${esc(t.s)}</small></span><span><select aria-label="Grup ${esc(t.n)}"${S.matches.length?" disabled":""} onchange="sgrp(${t.id},this.value)"><option value="">Belum ada grup</option>${"ABCDEFGH".split("").map(g=>`<option value="${g}"${t.g===g?" selected":""}>Grup ${g}</option>`).join("")}</select> <button class="b b2" onclick="delTeam(${t.id})">Hapus</button></span></div>`).join("")||"<p>Belum ada tim.</p>"}
 <h2>Tambah tim</h2><div class="mc"><p><input id="tn" placeholder="Nama tim" aria-label="Nama tim"> <input id="ts" placeholder="Sekolah / instansi" aria-label="Sekolah atau instansi"></p>${R.map((r,j)=>`<p><input id="m${j}" placeholder="Anggota ${j+1}" aria-label="Nama anggota ${j+1}"> <select id="r${j}" aria-label="Peran anggota ${j+1}">${R.map(x=>`<option${x===r?" selected":""}>${x}</option>`).join("")}</select></p>`).join("")}${[0,1,2].map(j=>`<p><input id="rn${j}" placeholder="Nama robot ${j+1}" aria-label="Nama robot ${j+1}"></p>`).join("")}<button class="b" onclick="addTeam()">Tambah tim</button></div>
-<h2>Jadwal grup</h2><p>Setelah semua tim punya grup, buat pertandingan grup. Waktu main diisi sendiri di bagian Input skor.</p><p>${inp("q","Lolos per grup")}${inp("tz","Zona waktu","text")}</p><button class="b" onclick="note=mkSched();save();draw()">Buat pertandingan grup</button> <button class="b b2" onclick="clrSched()">Hapus jadwal &amp; skor</button>
+<h2>Jadwal grup</h2><p>${inp("q","Lolos per grup")}${inp("tz","Zona waktu","text")}</p><button class="b" onclick="note=mkSched();save();draw()">Buat pertandingan grup</button> <button class="b b2" onclick="clrSched()">Hapus jadwal &amp; skor</button>
 <h2>Input skor</h2>${S.matches.map(m=>`<div class="ar"><span>${lb(m)}: ${nm(m.a)} vs ${nm(m.b)}</span><span><input class="tt" type="datetime-local" aria-label="Waktu main ${nm(m.a)} lawan ${nm(m.b)}" value="${esc(m.t)}" onchange="stm(${m.id},this.value)"> <input type="number" min="0" aria-label="Gol ${nm(m.a)}" value="${m.ga??""}" onchange="sm(${m.id},'ga',this.value)"> : <input type="number" min="0" aria-label="Gol ${nm(m.b)}" value="${m.gb??""}" onchange="sm(${m.id},'gb',this.value)">${m.st!=="g"?` <select aria-label="Pemenang adu penalti" onchange="sm(${m.id},'pen',this.value)"><option value="">Tanpa penalti</option><option value="a"${m.pen==="a"?" selected":""}>${nm(m.a)} menang</option><option value="b"${m.pen==="b"?" selected":""}>${nm(m.b)} menang</option></select>`:""}</span>${gd(m)}</div>`).join("")}
 <h2>Babak berikutnya</h2><button class="b" onclick="note=gen();save();draw()">Buat babak berikutnya</button>
 <h2>Penghargaan tambahan</h2><p>Pencetak gol dan Robot terbaik / MVP di Beranda dihitung otomatis dari data laga. Tambahkan penghargaan lain di sini, misalnya dari penilaian juri.</p>${(S.aw.c||[]).map((w,i)=>`<div class="ar"><span>${esc(w.t)}: ${esc((rbs().find(x=>x.id===w.r)||{}).n)}</span><button class="b b2" onclick="delAw(${i})">Hapus</button></div>`).join("")}<p><input id="at" placeholder="Nama penghargaan" aria-label="Nama penghargaan"> <select id="ar" aria-label="Robot pemenang">${rbs().map(x=>`<option value="${x.id}">${esc(x.n)} (${esc(x.t)})</option>`).join("")}</select> <button class="b" onclick="addAw()">Tambah</button></p>
 <h2>Data</h2><button class="b b2" onclick="if(confirm('Hapus semua tim, jadwal, dan skor?')){S.teams=[];S.matches=[];S.ko=null;S.aw={c:[]};note='';save();draw()}">Kosongkan semua data</button>`;
   }
 };
-const TABS=[["home","Beranda","index",""],["st","Klasemen","klasemen",""],["jd","Jadwal &amp; hasil","jadwal",""],["br","Bagan gugur","bagan",""],["pt","Peserta","peserta",""],["rb","Robot","robot",""]];
+const TABS=[["home","Beranda","index",""],["st","Klasemen","klasemen",""],["jd","Jadwal &amp; hasil","jadwal",""],["br","Bagan gugur","bagan",""],["pt","Peserta","peserta",""],["rb","Robot","robot","",],["ad","Admin","admin","⚙️"]];
 const MP=!!document.body.dataset.page,TT=Object.fromEntries(TABS.map(t=>[t[0],t[1]]));
 const href=t=>MP?t[2]+".html":"#"+t[2];
 function cur(){const h=MP?document.body.dataset.page:location.hash.slice(1);return (TABS.find(t=>t[2]===h)||TABS[0])[0]}
@@ -159,7 +159,7 @@ function setMenu(o){
 function draw(){
   V=cur();document.body.dataset.p=V;
   document.title=(V==="home"?"":TT[V].replace("&amp;","&")+" | ")+"SURO Cup";
-  document.getElementById("mn").innerHTML=TABS.map(t=>`<a href="${href(t)}"${t[0]===V?' aria-current="page"':""}><span class="ic" aria-hidden="true">${t[3]}</span>${t[1]}</a>`).join("");
+  document.getElementById("mn").innerHTML=TABS.filter(t => t[0] !== "ad").map(t=>`<a href="${href(t)}"${t[0]===V?' aria-current="page"':""}><span class="ic" aria-hidden="true">${t[3]}</span>${t[1]}</a>`).join("");
   setMenu(false);
   document.getElementById("app").innerHTML=`<div class="w">${V==="home"?`<h1 class="sr">Sulut United Robo Soccer Cup</h1>`:`<h1 class="pt">${TT[V]}</h1>`}${VW[V]()}</div>`;
 }
