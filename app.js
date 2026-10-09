@@ -1,13 +1,14 @@
 /* SURO Cup - papan turnamen robot sepak bola.
-   Data disimpan di localStorage browser ini. Pakai Ekspor/Impor di halaman Admin
-   untuk cadangan atau memindahkan data ke perangkat lain. */
+   Data disimpan di database (Neon Postgres lewat /api/data) dan di-cache di localStorage.
+   PIN admin diperiksa di server (env ADMIN_PIN), tidak ada lagi di kode ini. */
 
-// PIN admin hanya penghalang ringan di sisi klien (terlihat lewat View Source). Ganti sebelum dipakai.
-const ADMIN_PIN="EURO2425";
+const API="/api/data";
+let PIN=(()=>{try{return sessionStorage.getItem("suro-pin")||""}catch(e){return ""}})();
+let pushT=null,synced=false,remoteEmpty=false,ver=null;
 
 const R=["Kapten / operator","Operator","Strategi","Programmer","Mekanik","Cadangan"];
 const K="suro-cup-v1",OLD_K="rsf-demo-5";
-let S,V="home",note="",ok=(()=>{try{return sessionStorage.getItem("suro-ok")==="1"}catch(e){return false}})();
+let S,V="home",note="",ok=(()=>{try{return sessionStorage.getItem("suro-ok")==="1"&&!!sessionStorage.getItem("suro-pin")}catch(e){return false}})();
 
 const blank=()=>({teams:[],matches:[],ko:null,cfg:{q:2,tz:"WITA"},aw:{c:[]}});
 function norm(d){
@@ -26,7 +27,32 @@ function load(){
   return blank();
 }
 S=load();
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){flash("Gagal menyimpan: penyimpanan browser penuh atau diblokir.")}};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){flash("Gagal menyimpan: penyimpanan browser penuh atau diblokir.")}push()};
+function push(){if(!ok||!synced)return;clearTimeout(pushT);pushT=setTimeout(doPush,400)}
+async function doPush(){
+  try{
+    const r=await fetch(API,{method:"PUT",headers:{"content-type":"application/json","x-admin-pin":PIN},body:JSON.stringify(S)});
+    if(r.status===401)return flash("PIN ditolak server. Keluar lalu masuk lagi.");
+    if(!r.ok)throw 0;
+    ver=(await r.json()).updatedAt;remoteEmpty=false;flash("Tersimpan ke server.");
+  }catch(e){flash("Gagal menyimpan ke server. Data masih ada di browser ini, coba ubah/simpan lagi.")}
+}
+// Ambil data dari server. Penonton: otomatis ikut berubah. Admin yang sedang login tidak ditimpa.
+async function sync(first){
+  if(!first&&V==="ad"&&ok)return;
+  try{
+    const r=await fetch(first?API+"?t="+Date.now():API,{cache:"no-store"});
+    if(!r.ok)throw 0;
+    const j=await r.json();
+    synced=true;
+    if(!j.data){remoteEmpty=true;return}
+    remoteEmpty=false;
+    if(j.updatedAt===ver)return;
+    ver=j.updatedAt;S=norm(j.data);
+    try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}
+    draw();
+  }catch(e){if(first)flash("Tidak bisa terhubung ke server. Menampilkan data tersimpan di browser ini.")}
+}
 function flash(msg){note=msg;const e=document.querySelector('[role="status"]');if(e)e.textContent=msg}
 
 const esc=s=>s==null?"":String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -194,7 +220,7 @@ const VW={
 <h2>Input skor</h2>${S.matches.map(m=>`<div class="ar"><span>${lb(m)}: ${nm(m.a)} vs ${nm(m.b)}</span><span><input class="tt" type="datetime-local" aria-label="Waktu main ${nm(m.a)} lawan ${nm(m.b)}" value="${esc(m.t)}" onchange="stm(${m.id},this.value)"> <input type="number" min="0" aria-label="Gol ${nm(m.a)}" value="${m.ga??""}" onchange="sm(${m.id},'ga',this.value)"> : <input type="number" min="0" aria-label="Gol ${nm(m.b)}" value="${m.gb??""}" onchange="sm(${m.id},'gb',this.value)">${m.st!=="g"?` <select aria-label="Pemenang adu penalti" onchange="sm(${m.id},'pen',this.value)"><option value="">Tanpa penalti</option><option value="a"${m.pen==="a"?" selected":""}>${nm(m.a)} menang</option><option value="b"${m.pen==="b"?" selected":""}>${nm(m.b)} menang</option></select>`:""}</span>${gd(m)}</div>`).join("")}
 <h2>Babak berikutnya</h2><button class="b" onclick="note=gen();save();draw()">Buat babak berikutnya</button> <button class="b b2" onclick="resetKo()">Reset bagan gugur</button>
 <h2>Penghargaan tambahan</h2><p>Pencetak gol dan Robot terbaik / MVP di Beranda dihitung otomatis dari data laga. Tambahkan penghargaan lain di sini, misalnya dari penilaian juri.</p>${(S.aw.c||[]).map((w,i)=>`<div class="ar"><span>${esc(w.t)}: ${esc((rbs().find(x=>x.id===w.r)||{}).n)}</span><button class="b b2" onclick="delAw(${i})">Hapus</button></div>`).join("")}<p><input id="at" placeholder="Nama penghargaan" aria-label="Nama penghargaan"> <select id="ar" aria-label="Robot pemenang">${rbs().map(x=>`<option value="${x.id}">${esc(x.n)} (${esc(x.t)})</option>`).join("")}</select> <button class="b" onclick="addAw()">Tambah</button></p>
-<h2>Data</h2><p>Data tersimpan di browser ini saja. Ekspor untuk cadangan atau untuk memindahkannya ke perangkat lain, lalu impor di sana.</p><p><button class="b" onclick="exportData()">Ekspor data (JSON)</button></p><p><label>Impor data dari file JSON<br><input type="file" accept="application/json,.json" onchange="importData(this)"></label></p><button class="b b2" onclick="clearAll()">Kosongkan semua data</button>`;
+<h2>Data</h2><p>Data tersimpan di database server dan otomatis dilihat semua pengunjung. Ekspor tetap berguna sebagai cadangan.</p><p><button class="b" onclick="exportData()">Ekspor data (JSON)</button></p><p><label>Impor data dari file JSON<br><input type="file" accept="application/json,.json" onchange="importData(this)"></label></p><button class="b b2" onclick="clearAll()">Kosongkan semua data</button>`;
   }
 };
 const TABS=[["home","Beranda","index"],["st","Klasemen","klasemen"],["jd","Jadwal &amp; hasil","jadwal"],["br","Bagan gugur","bagan"],["pt","Peserta","peserta"],["rb","Robot","robot"],["ad","Admin","admin"]];
@@ -218,8 +244,20 @@ function ft(m){
   const p=n=>String(n).padStart(2,"0");
   return `<time datetime="${esc(m.t)}">${d.toLocaleDateString("id-ID",{weekday:"short",day:"numeric",month:"short"})}, ${p(d.getHours())}:${p(d.getMinutes())}</time> ${esc(S.cfg.tz||"")}`;
 }
-function logout(){ok=false;try{sessionStorage.removeItem("suro-ok")}catch(e){}draw()}
-function login(){if(document.getElementById("pin").value===ADMIN_PIN){ok=true;note="";try{sessionStorage.setItem("suro-ok","1")}catch(e){}}else note="PIN salah. Coba lagi.";draw()}
+function logout(){ok=false;PIN="";try{sessionStorage.removeItem("suro-ok");sessionStorage.removeItem("suro-pin")}catch(e){}draw()}
+async function login(){
+  const p=document.getElementById("pin").value;
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"x-admin-pin":p}});
+    if(r.ok){
+      ok=true;PIN=p;note="";
+      try{sessionStorage.setItem("suro-ok","1");sessionStorage.setItem("suro-pin",p)}catch(e){}
+      // Server masih kosong tapi browser ini punya data lama: kirim sebagai data awal.
+      if(synced&&remoteEmpty&&S.teams.length)doPush();
+    }else note=r.status===401?"PIN salah. Coba lagi.":"Server tidak merespons. Coba lagi.";
+  }catch(e){note="Tidak bisa terhubung ke server."}
+  draw();
+}
 // Apakah hasil laga ini sudah dipakai untuk menyusun babak berikutnya?
 function later(m){
   if(m.st==="g")return !!S.ko;
@@ -311,3 +349,5 @@ addEventListener("storage",e=>{
   else draw();
 });
 draw();
+sync(true);
+setInterval(()=>{if(!document.hidden)sync(false)},15000);
