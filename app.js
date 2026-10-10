@@ -5,8 +5,9 @@
 const API="/api/data";
 let PIN=(()=>{try{return sessionStorage.getItem("suro-pin")||""}catch(e){return ""}})();
 let pushT=null,synced=false,remoteEmpty=false,ver=null;
+let editT=null,editM=null; // tim / laga yang sedang diedit di panel admin
 
-const R=["Kapten / operator","Operator","Elektronika","Programmer","Mekanik","Cadangan"];
+const R=["Kapten / operator","Operator","Strategi","Programmer","Mekanik","Cadangan"];
 const K="suro-cup-v1",OLD_K="rsf-demo-5";
 let S,V="home",note="",ok=(()=>{try{return sessionStorage.getItem("suro-ok")==="1"&&!!sessionStorage.getItem("suro-pin")}catch(e){return false}})();
 
@@ -162,15 +163,73 @@ function gen(){
   }
   return "Semua babak sudah dibuat.";
 }
+// ----- Form tim: dipakai untuk Tambah dan Edit. Semua kolom wajib diisi. -----
+const say=(p,t)=>{const e=document.getElementById(p+"msg");if(e)e.textContent=t};
+function teamForm(p,t){
+  const mem=j=>t&&t.m[j]?t.m[j]:["",R[j]],rob=j=>t&&t.rb[j]?t.rb[j].n:"";
+  const f=(id,ph,val)=>`<input id="${p}${id}" placeholder="${ph}" aria-label="${ph}" aria-required="true" required maxlength="60" value="${esc(val)}">`;
+  return `<p><small>Semua kolom wajib diisi.</small></p><p>${f("tn","Nama tim",t?t.n:"")} ${f("ts","Sekolah / instansi",t?t.s:"")}</p>${R.map((r,j)=>`<p>${f("m"+j,"Anggota "+(j+1),mem(j)[0])} <select id="${p}r${j}" aria-label="Peran anggota ${j+1}">${R.map(x=>`<option${x===mem(j)[1]?" selected":""}>${esc(x)}</option>`).join("")}</select></p>`).join("")}${[0,1,2].map(j=>`<p>${f("rn"+j,"Nama robot "+(j+1),rob(j))}</p>`).join("")}<p role="alert" id="${p}msg"></p>`;
+}
+function readTeam(p,ex){
+  const el=id=>document.getElementById(p+id),v=id=>el(id).value.trim(),miss=[],ids=[];
+  const need=(id,label)=>{const x=v(id);if(!x){miss.push(label);ids.push(id)}return x};
+  const n=need("tn","nama tim"),s=need("ts","sekolah / instansi");
+  const m=R.map((r,j)=>[need("m"+j,"anggota "+(j+1)),v("r"+j)]);
+  const rb=[0,1,2].map(j=>({n:need("rn"+j,"robot "+(j+1))}));
+  if(miss.length){el(ids[0]).focus();return {err:"Lengkapi dulu: "+miss.join(", ")+"."}}
+  if(S.teams.some(t=>t.id!==ex&&String(t.n).toLowerCase()===n.toLowerCase()))return {err:"Nama tim sudah dipakai."};
+  if(new Set(rb.map(r=>r.n.toLowerCase())).size<3)return {err:"Nama ketiga robot harus berbeda."};
+  const used=S.teams.filter(t=>t.id!==ex).flatMap(t=>t.rb||[]).map(r=>String(r.n).toLowerCase());
+  const dup=rb.find(r=>used.includes(r.n.toLowerCase()));
+  if(dup)return {err:"Nama robot \""+dup.n+"\" sudah dipakai tim lain."};
+  return {t:{n,s,m,rb}};
+}
 function addTeam(){
-  const v=id=>document.getElementById(id).value.trim(),n=v("tn");
-  if(!n)return flash("Isi nama tim dulu.");
-  if(S.teams.some(t=>String(t.n).toLowerCase()===n.toLowerCase()))return flash("Nama tim sudah dipakai.");
-  S.teams.push({id:S.teams.reduce((x,t)=>Math.max(x,t.id),-1)+1,n,s:v("ts"),g:null,m:R.map((r,j)=>[v("m"+j)||"Anggota "+(j+1),v("r"+j)]),rb:[0,1,2].map(j=>({n:v("rn"+j)||n+" "+(j+1)}))});
+  const r=readTeam("",null);if(r.err)return say("",r.err);
+  S.teams.push({id:S.teams.reduce((x,t)=>Math.max(x,t.id),-1)+1,g:null,...r.t});
   note=S.matches.length?"Tim ditambahkan. Tim ini baru ikut jadwal setelah undian ulang.":"Tim ditambahkan.";
+  save();draw();say("","✓ "+note);
+  const e=document.getElementById("tn");if(e)e.focus();
+}
+function editTeam(id){editT=id;note="";draw();const e=document.getElementById("etn");if(e)e.focus()}
+function saveTeam(id){
+  const r=readTeam("e",id);if(r.err)return say("e",r.err);
+  Object.assign(S.teams.find(t=>t.id===id),r.t);
+  editT=null;note="Data tim disimpan.";save();draw();
+}
+// ----- Edit laga babak grup: ganti pasangan tim / ronde, atau hapus laga -----
+// (Waktu dan skor tetap diubah langsung di barisnya. Pasangan babak gugur disusun otomatis lewat "Reset bagan gugur".)
+function mForm(m){
+  const opt=sel=>S.teams.map(t=>`<option value="${t.id}"${t.id===sel?" selected":""}>${esc(t.n)}${t.g?" (Grup "+t.g+")":""}</option>`).join("");
+  return `<div class="mc" style="flex-basis:100%;width:100%"><p><label>Tim A <select id="ma">${opt(m.a)}</select></label> <label>Tim B <select id="mb">${opt(m.b)}</select></label> <label>Ronde <input id="mr" type="number" min="1" value="${m.r}"></label></p><p><small>Waktu dan skor diubah langsung di baris di atas. Mengganti tim menghapus skor laga ini.</small></p><p role="alert" id="mmsg"></p><button class="b" onclick="saveM(${m.id})">Simpan</button> <button class="b b2" onclick="editM=null;draw()">Batal</button> <button class="b b2" onclick="delM(${m.id})">Hapus laga</button></div>`;
+}
+function editMatch(id){editM=id;note="";draw()}
+function saveM(id){
+  const m=S.matches.find(x=>x.id===id),a=+document.getElementById("ma").value,b=+document.getElementById("mb").value,e=t=>say("m",t);
+  const ta=S.teams.find(t=>t.id===a),tb=S.teams.find(t=>t.id===b);
+  if(!ta||!tb)return e("Pilih kedua tim.");
+  if(a===b)return e("Tim A dan Tim B harus berbeda.");
+  if(!ta.g||ta.g!==tb.g)return e("Laga babak grup harus mempertemukan dua tim dari grup yang sama.");
+  const r=Math.max(1,parseInt(document.getElementById("mr").value,10)||1),swap=a===m.b&&b===m.a,changed=a!==m.a||b!==m.b;
+  if((changed||r!==m.r)&&later(m))return e("Laga ini sudah dipakai menyusun bagan gugur. Klik \"Reset bagan gugur\" dulu.");
+  if(changed&&!swap){
+    const has=pl(m)||m.mv||(m.gs&&Object.keys(m.gs).length);
+    if(has&&!confirm("Mengganti tim akan menghapus skor, gol per robot, dan robot terbaik laga ini. Lanjutkan?"))return;
+    m.ga=null;m.gb=null;delete m.gs;delete m.mv;delete m.pen;
+  }
+  if(swap){[m.ga,m.gb]=[m.gb,m.ga];if(m.pen)m.pen=m.pen==="a"?"b":"a"}
+  m.a=a;m.b=b;m.r=r;editM=null;
+  const dup=S.matches.some(x=>x.id!==id&&x.st==="g"&&((x.a===a&&x.b===b)||(x.a===b&&x.b===a)));
+  note="Data laga disimpan."+(dup?" Peringatan: pasangan tim ini muncul lebih dari sekali di jadwal.":"");
   save();draw();
 }
-function delTeam(id){
+function delM(id){
+  const m=S.matches.find(x=>x.id===id);
+  if(later(m))return say("m","Laga ini sudah dipakai menyusun bagan gugur. Klik \"Reset bagan gugur\" dulu.");
+  if(!confirm("Hapus laga ini beserta skornya? Klasemen dihitung ulang."))return;
+  S.matches=S.matches.filter(x=>x.id!==id);editM=null;note="Laga dihapus.";save();draw();
+}
+function delTeam(id){if(editT===id)editT=null;
   if(S.matches.length)note="Tim tidak bisa dihapus setelah jadwal dibuat.";
   else{S.teams=S.teams.filter(t=>t.id!==id);S.aw.c=S.aw.c.filter(w=>!String(w.r).startsWith(id+":"));save();note=""}
   draw();
@@ -187,7 +246,7 @@ const VW={
   },
   st(){
     if(!grp().length)return `<p>Klasemen muncul setelah tim dibagi ke dalam grup.</p>`;
-    return `<div class="gt">`+grp().map(g=>`<div><h2>Grup ${g}</h2><div class="sx" tabindex="0" role="region" aria-label="Klasemen Grup ${g}"><table class="stt"><caption class="sr">Klasemen Grup ${g}</caption><thead><tr><th scope="col"><abbr title="Posisi">Pos</abbr><th scope="col">Tim<th scope="col"><abbr title="Main">MP</abbr><th scope="col"><abbr title="Menang">W</abbr><th scope="col"><abbr title="Seri">D</abbr><th scope="col"><abbr title="Kalah">L</abbr><th scope="col"><abbr title="Gol memasukkan">GF</abbr><th scope="col"><abbr title="Gol kemasukan">GA</abbr><th scope="col"><abbr title="Selisih gol">GD</abbr><th scope="col"><abbr title="Poin">Pts</abbr><tbody>${std(g).map((r,i)=>`<tr class="${i<S.cfg.q?"q":""}"><td>${i+1}${i<S.cfg.q?`<span aria-hidden="true"> </span><span class="sr"> lolos ke babak gugur</span>`:""}<td>${esc(r.t.n)}<td>${r.mp}<td>${r.w}<td>${r.d}<td>${r.l}<td>${r.gf}<td>${r.ga}<td>${r.gf-r.ga}<td><b>${r.p}</b>`).join("")}</table></div></div>`).join("")+`</div>`;
+    return `<div class="gt">`+grp().map(g=>`<div><h2>Grup ${g}</h2><div class="sx" tabindex="0" role="region" aria-label="Klasemen Grup ${g}"><table class="stt"><caption class="sr">Klasemen Grup ${g}</caption><thead><tr><th scope="col"><abbr title="Posisi">Pos</abbr><th scope="col">Tim<th scope="col"><abbr title="Main">MP</abbr><th scope="col"><abbr title="Menang">W</abbr><th scope="col"><abbr title="Seri">D</abbr><th scope="col"><abbr title="Kalah">L</abbr><th scope="col"><abbr title="Gol memasukkan">GF</abbr><th scope="col"><abbr title="Gol kemasukan">GA</abbr><th scope="col"><abbr title="Selisih gol">GD</abbr><th scope="col"><abbr title="Poin">Pts</abbr><tbody>${std(g).map((r,i)=>`<tr class="${i<S.cfg.q?"q":""}"><td>${i+1}${i<S.cfg.q?`<span aria-hidden="true"> ✓</span><span class="sr"> lolos ke babak gugur</span>`:""}<td>${esc(r.t.n)}<td>${r.mp}<td>${r.w}<td>${r.d}<td>${r.l}<td>${r.gf}<td>${r.ga}<td>${r.gf-r.ga}<td><b>${r.p}</b>`).join("")}</table></div></div>`).join("")+`</div><p><small>MP main, W menang, D seri, L kalah, GF gol memasukkan, GA gol kemasukan, GD selisih gol, Pts poin. Menang bernilai 3 poin, seri 1 poin, kalah 0 poin. Urutan klasemen: poin, selisih gol, lalu gol memasukkan. Jika masih sama, panitia menentukan sesuai peraturan lomba. ${S.cfg.q} tim teratas tiap grup (tanda ✓ dan garis oranye) lolos ke babak gugur.</small></p>`;
   },
   jd(){
     if(!S.matches.length)return `<p>Jadwal belum dibuat.</p>`;
@@ -214,10 +273,10 @@ const VW={
   ad(){
     if(!ok)return `<p><input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN admin" onkeydown="if(event.key==='Enter')login()"> <button class="b" onclick="login()">Masuk</button></p><p role="status">${esc(note)}</p>`;
     const c=S.cfg,inp=(k,l,t)=>`<label>${l}<br><input type="${t||"number"}" min="1" value="${esc(c[k])}" onchange="S.cfg.${k}=${t?"this.value":"Math.max(1,+this.value||1)"};save()"></label> `;
-    return `<p><button class="b b2" onclick="logout()">Keluar</button></p><p role="status">${esc(note)}</p><h2>Tim (${S.teams.length})</h2><p></p>${S.teams.map(t=>`<div class="ar"><span>${esc(t.n)} <small>${esc(t.s)}</small></span><span><select aria-label="Grup ${esc(t.n)}"${S.matches.length?" disabled":""} onchange="sgrp(${t.id},this.value)"><option value="">Belum ada grup</option>${"ABCDEFGH".split("").map(g=>`<option value="${g}"${t.g===g?" selected":""}>Grup ${g}</option>`).join("")}</select> <button class="b b2" onclick="delTeam(${t.id})">Hapus</button></span></div>`).join("")||"<p>Belum ada tim.</p>"}
-<h2>Tambah tim</h2><div class="mc"><p><input id="tn" placeholder="Nama tim" aria-label="Nama tim"> <input id="ts" placeholder="Sekolah / instansi" aria-label="Sekolah atau instansi"></p>${R.map((r,j)=>`<p><input id="m${j}" placeholder="Anggota ${j+1}" aria-label="Nama anggota ${j+1}"> <select id="r${j}" aria-label="Peran anggota ${j+1}">${R.map(x=>`<option${x===r?" selected":""}>${x}</option>`).join("")}</select></p>`).join("")}${[0,1,2].map(j=>`<p><input id="rn${j}" placeholder="Nama robot ${j+1}" aria-label="Nama robot ${j+1}"></p>`).join("")}<button class="b" onclick="addTeam()">Tambah tim</button></div>
+    return `<p><button class="b b2" onclick="logout()">Keluar</button></p><p role="status">${esc(note)}</p><h2>Tim (${S.teams.length})</h2><p></p>${S.teams.map(t=>`<div class="ar"><span>${esc(t.n)} <small>${esc(t.s)}</small></span><span><select aria-label="Grup ${esc(t.n)}"${S.matches.length?" disabled":""} onchange="sgrp(${t.id},this.value)"><option value="">Belum ada grup</option>${"ABCDEFGH".split("").map(g=>`<option value="${g}"${t.g===g?" selected":""}>Grup ${g}</option>`).join("")}</select> <button class="b b2" onclick="editTeam(${t.id})">Edit</button> <button class="b b2" onclick="delTeam(${t.id})">Hapus</button></span>${editT===t.id?`<div class="mc" style="flex-basis:100%;width:100%">${teamForm("e",t)}<button class="b" onclick="saveTeam(${t.id})">Simpan perubahan</button> <button class="b b2" onclick="editT=null;draw()">Batal</button></div>`:""}</div>`).join("")||"<p>Belum ada tim.</p>"}
+<h2>Tambah tim</h2><div class="mc">${teamForm("",null)}<button class="b" onclick="addTeam()">Tambah tim</button></div>
 <h2>Jadwal grup</h2><p>${inp("q","Lolos per grup")}${inp("tz","Zona waktu","text")}</p><button class="b" onclick="note=mkSched();save();draw()">Buat pertandingan grup</button> <button class="b b2" onclick="clrSched()">Hapus jadwal &amp; skor</button>
-<h2>Input skor</h2>${S.matches.map(m=>`<div class="ar"><span>${lb(m)}: ${nm(m.a)} vs ${nm(m.b)}</span><span><input class="tt" type="datetime-local" aria-label="Waktu main ${nm(m.a)} lawan ${nm(m.b)}" value="${esc(m.t)}" onchange="stm(${m.id},this.value)"> <input type="number" min="0" aria-label="Gol ${nm(m.a)}" value="${m.ga??""}" onchange="sm(${m.id},'ga',this.value)"> : <input type="number" min="0" aria-label="Gol ${nm(m.b)}" value="${m.gb??""}" onchange="sm(${m.id},'gb',this.value)">${m.st!=="g"?` <select aria-label="Pemenang adu penalti" onchange="sm(${m.id},'pen',this.value)"><option value="">Tanpa penalti</option><option value="a"${m.pen==="a"?" selected":""}>${nm(m.a)} menang</option><option value="b"${m.pen==="b"?" selected":""}>${nm(m.b)} menang</option></select>`:""}</span>${gd(m)}</div>`).join("")}
+<h2>Input skor</h2>${S.matches.map(m=>`<div class="ar"><span>${lb(m)}: ${nm(m.a)} vs ${nm(m.b)}</span><span><input class="tt" type="datetime-local" aria-label="Waktu main ${nm(m.a)} lawan ${nm(m.b)}" value="${esc(m.t)}" onchange="stm(${m.id},this.value)"> <input type="number" min="0" aria-label="Gol ${nm(m.a)}" value="${m.ga??""}" onchange="sm(${m.id},'ga',this.value)"> : <input type="number" min="0" aria-label="Gol ${nm(m.b)}" value="${m.gb??""}" onchange="sm(${m.id},'gb',this.value)">${m.st!=="g"?` <select aria-label="Pemenang adu penalti" onchange="sm(${m.id},'pen',this.value)"><option value="">Tanpa penalti</option><option value="a"${m.pen==="a"?" selected":""}>${nm(m.a)} menang</option><option value="b"${m.pen==="b"?" selected":""}>${nm(m.b)} menang</option></select>`:""}${m.st==="g"?` <button class="b b2" onclick="editMatch(${m.id})">Edit</button>`:""}</span>${gd(m)}${editM===m.id?mForm(m):""}</div>`).join("")}
 <h2>Babak berikutnya</h2><button class="b" onclick="note=gen();save();draw()">Buat babak berikutnya</button> <button class="b b2" onclick="resetKo()">Reset bagan gugur</button>
 <h2>Penghargaan tambahan</h2><p>Pencetak gol dan Robot terbaik / MVP di Beranda dihitung otomatis dari data laga. Tambahkan penghargaan lain di sini, misalnya dari penilaian juri.</p>${(S.aw.c||[]).map((w,i)=>`<div class="ar"><span>${esc(w.t)}: ${esc((rbs().find(x=>x.id===w.r)||{}).n)}</span><button class="b b2" onclick="delAw(${i})">Hapus</button></div>`).join("")}<p><input id="at" placeholder="Nama penghargaan" aria-label="Nama penghargaan"> <select id="ar" aria-label="Robot pemenang">${rbs().map(x=>`<option value="${x.id}">${esc(x.n)} (${esc(x.t)})</option>`).join("")}</select> <button class="b" onclick="addAw()">Tambah</button></p>
 <h2>Data</h2><p>Data tersimpan di database server dan otomatis dilihat semua pengunjung. Ekspor tetap berguna sebagai cadangan.</p><p><button class="b" onclick="exportData()">Ekspor data (JSON)</button></p><p><label>Impor data dari file JSON<br><input type="file" accept="application/json,.json" onchange="importData(this)"></label></p><button class="b b2" onclick="clearAll()">Kosongkan semua data</button>`;
