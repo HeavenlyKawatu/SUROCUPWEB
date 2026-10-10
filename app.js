@@ -1,13 +1,10 @@
-/* SURO Cup - papan turnamen robot sepak bola.
-   Data disimpan di database (Neon Postgres lewat /api/data) dan di-cache di localStorage.
-   PIN admin diperiksa di server (env ADMIN_PIN), tidak ada lagi di kode ini. */
 
 const API="/api/data";
 let PIN=(()=>{try{return sessionStorage.getItem("suro-pin")||""}catch(e){return ""}})();
 let pushT=null,synced=false,remoteEmpty=false,ver=null;
 let editT=null,editM=null; // tim / laga yang sedang diedit di panel admin
 
-const R=["Kapten / operator","Operator","Strategi","Programmer","Mekanik","Cadangan"];
+const R=["Kapten / operator","Operator","Elektronika","Programmer","Mekanik","Cadangan"];
 const K="suro-cup-v1",OLD_K="rsf-demo-5";
 let S,V="home",note="",ok=(()=>{try{return sessionStorage.getItem("suro-ok")==="1"&&!!sessionStorage.getItem("suro-pin")}catch(e){return false}})();
 
@@ -278,8 +275,8 @@ const VW={
 <h2>Jadwal grup</h2><p>${inp("q","Lolos per grup")}${inp("tz","Zona waktu","text")}</p><button class="b" onclick="note=mkSched();save();draw()">Buat pertandingan grup</button> <button class="b b2" onclick="clrSched()">Hapus jadwal &amp; skor</button>
 <h2>Input skor</h2>${S.matches.map(m=>`<div class="ar"><span>${lb(m)}: ${nm(m.a)} vs ${nm(m.b)}</span><span><input class="tt" type="datetime-local" aria-label="Waktu main ${nm(m.a)} lawan ${nm(m.b)}" value="${esc(m.t)}" onchange="stm(${m.id},this.value)"> <input type="number" min="0" aria-label="Gol ${nm(m.a)}" value="${m.ga??""}" onchange="sm(${m.id},'ga',this.value)"> : <input type="number" min="0" aria-label="Gol ${nm(m.b)}" value="${m.gb??""}" onchange="sm(${m.id},'gb',this.value)">${m.st!=="g"?` <select aria-label="Pemenang adu penalti" onchange="sm(${m.id},'pen',this.value)"><option value="">Tanpa penalti</option><option value="a"${m.pen==="a"?" selected":""}>${nm(m.a)} menang</option><option value="b"${m.pen==="b"?" selected":""}>${nm(m.b)} menang</option></select>`:""}${m.st==="g"?` <button class="b b2" onclick="editMatch(${m.id})">Edit</button>`:""}</span>${gd(m)}${editM===m.id?mForm(m):""}</div>`).join("")}
 <h2>Babak berikutnya</h2><button class="b" onclick="note=gen();save();draw()">Buat babak berikutnya</button> <button class="b b2" onclick="resetKo()">Reset bagan gugur</button>
-<h2>Penghargaan tambahan</h2><p>Pencetak gol dan Robot terbaik / MVP di Beranda dihitung otomatis dari data laga. Tambahkan penghargaan lain di sini, misalnya dari penilaian juri.</p>${(S.aw.c||[]).map((w,i)=>`<div class="ar"><span>${esc(w.t)}: ${esc((rbs().find(x=>x.id===w.r)||{}).n)}</span><button class="b b2" onclick="delAw(${i})">Hapus</button></div>`).join("")}<p><input id="at" placeholder="Nama penghargaan" aria-label="Nama penghargaan"> <select id="ar" aria-label="Robot pemenang">${rbs().map(x=>`<option value="${x.id}">${esc(x.n)} (${esc(x.t)})</option>`).join("")}</select> <button class="b" onclick="addAw()">Tambah</button></p>
-<h2>Data</h2><p>Data tersimpan di database server dan otomatis dilihat semua pengunjung. Ekspor tetap berguna sebagai cadangan.</p><p><button class="b" onclick="exportData()">Ekspor data (JSON)</button></p><p><label>Impor data dari file JSON<br><input type="file" accept="application/json,.json" onchange="importData(this)"></label></p><button class="b b2" onclick="clearAll()">Kosongkan semua data</button>`;
+<h2>Penghargaan tambahan</h2>${(S.aw.c||[]).map((w,i)=>`<div class="ar"><span>${esc(w.t)}: ${esc((rbs().find(x=>x.id===w.r)||{}).n)}</span><button class="b b2" onclick="delAw(${i})">Hapus</button></div>`).join("")}<p><input id="at" placeholder="Nama penghargaan" aria-label="Nama penghargaan"> <select id="ar" aria-label="Robot pemenang">${rbs().map(x=>`<option value="${x.id}">${esc(x.n)} (${esc(x.t)})</option>`).join("")}</select> <button class="b" onclick="addAw()">Tambah</button></p>
+<h2>Data</h2><p><button class="b" onclick="exportData()">Ekspor data (JSON)</button></p><p><label>Impor data dari file JSON<br><input type="file" accept="application/json,.json" onchange="importData(this)"></label></p><button class="b b2" onclick="clearAll()">Kosongkan semua data</button>`;
   }
 };
 const TABS=[["home","Beranda","index"],["st","Klasemen","klasemen"],["jd","Jadwal &amp; hasil","jadwal"],["br","Bagan gugur","bagan"],["pt","Peserta","peserta"],["rb","Robot","robot"],["ad","Admin","admin"]];
