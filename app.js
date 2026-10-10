@@ -160,7 +160,7 @@ function gen(){
   }
   return "Semua babak sudah dibuat.";
 }
-// ----- Form tim: dipakai untuk Tambah dan Edit. Semua kolom wajib diisi. -----
+
 const say=(p,t)=>{const e=document.getElementById(p+"msg");if(e)e.textContent=t};
 function teamForm(p,t){
   const mem=j=>t&&t.m[j]?t.m[j]:["",R[j]],rob=j=>t&&t.rb[j]?t.rb[j].n:"";
@@ -194,8 +194,7 @@ function saveTeam(id){
   Object.assign(S.teams.find(t=>t.id===id),r.t);
   editT=null;note="Data tim disimpan.";save();draw();
 }
-// ----- Edit laga babak grup: ganti pasangan tim / ronde, atau hapus laga -----
-// (Waktu dan skor tetap diubah langsung di barisnya. Pasangan babak gugur disusun otomatis lewat "Reset bagan gugur".)
+
 function mForm(m){
   const opt=sel=>S.teams.map(t=>`<option value="${t.id}"${t.id===sel?" selected":""}>${esc(t.n)}${t.g?" (Grup "+t.g+")":""}</option>`).join("");
   return `<div class="mc" style="flex-basis:100%;width:100%"><p><label>Tim A <select id="ma">${opt(m.a)}</select></label> <label>Tim B <select id="mb">${opt(m.b)}</select></label> <label>Ronde <input id="mr" type="number" min="1" value="${m.r}"></label></p><p><small>Waktu dan skor diubah langsung di baris di atas. Mengganti tim menghapus skor laga ini.</small></p><p role="alert" id="mmsg"></p><button class="b" onclick="saveM(${m.id})">Simpan</button> <button class="b b2" onclick="editM=null;draw()">Batal</button> <button class="b b2" onclick="delM(${m.id})">Hapus laga</button></div>`;
@@ -243,7 +242,7 @@ const VW={
   },
   st(){
     if(!grp().length)return `<p>Klasemen muncul setelah tim dibagi ke dalam grup.</p>`;
-    return `<div class="gt">`+grp().map(g=>`<div><h2>Grup ${g}</h2><div class="sx" tabindex="0" role="region" aria-label="Klasemen Grup ${g}"><table class="stt"><caption class="sr">Klasemen Grup ${g}</caption><thead><tr><th scope="col"><abbr title="Posisi">Pos</abbr><th scope="col">Tim<th scope="col"><abbr title="Main">MP</abbr><th scope="col"><abbr title="Menang">W</abbr><th scope="col"><abbr title="Seri">D</abbr><th scope="col"><abbr title="Kalah">L</abbr><th scope="col"><abbr title="Gol memasukkan">GF</abbr><th scope="col"><abbr title="Gol kemasukan">GA</abbr><th scope="col"><abbr title="Selisih gol">GD</abbr><th scope="col"><abbr title="Poin">Pts</abbr><tbody>${std(g).map((r,i)=>`<tr class="${i<S.cfg.q?"q":""}"><td>${i+1}${i<S.cfg.q?`<span aria-hidden="true"> ✓</span><span class="sr"> lolos ke babak gugur</span>`:""}<td>${esc(r.t.n)}<td>${r.mp}<td>${r.w}<td>${r.d}<td>${r.l}<td>${r.gf}<td>${r.ga}<td>${r.gf-r.ga}<td><b>${r.p}</b>`).join("")}</table></div></div>`).join("")+`</div><p></p>`;
+    return `<div class="gt">`+grp().map(g=>`<div><h2>Grup ${g}</h2><div class="sx" tabindex="0" role="region" aria-label="Klasemen Grup ${g}"><table class="stt"><caption class="sr">Klasemen Grup ${g}</caption><thead><tr><th scope="col"><abbr title="Posisi">Pos</abbr><th scope="col">Tim<th scope="col"><abbr title="Main">MP</abbr><th scope="col"><abbr title="Menang">W</abbr><th scope="col"><abbr title="Seri">D</abbr><th scope="col"><abbr title="Kalah">L</abbr><th scope="col"><abbr title="Gol memasukkan">GF</abbr><th scope="col"><abbr title="Gol kemasukan">GA</abbr><th scope="col"><abbr title="Selisih gol">GD</abbr><th scope="col"><abbr title="Poin">Pts</abbr><tbody>${std(g).map((r,i)=>`<tr class="${i<S.cfg.q?"q":""}"><td>${i+1}${i<S.cfg.q?`<span aria-hidden="true"> </span><span class="sr"> lolos ke babak gugur</span>`:""}<td>${esc(r.t.n)}<td>${r.mp}<td>${r.w}<td>${r.d}<td>${r.l}<td>${r.gf}<td>${r.ga}<td>${r.gf-r.ga}<td><b>${r.p}</b>`).join("")}</table></div></div>`).join("")+`</div><p></p>`;
   },
   jd(){
     if(!S.matches.length)return `<p>Jadwal belum dibuat.</p>`;
